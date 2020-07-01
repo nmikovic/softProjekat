@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 
+globalCnt = 0
+
 
 def detection_line(frame):
     original = frame
@@ -25,37 +27,57 @@ def detection_line(frame):
     return x1, y1, x2, y2
 
 
-def count_people(frame):
-    cv2.imshow('circles', frame)
+def rect_people(old_frame, new_frame, line):
+    kernel = cv2.getStructuringElement(cv2.MORPH_CROSS, (7, 7))
+    diff = cv2.absdiff(old_frame, new_frame)
+    gray = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    frame = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 5, 5)
+
+    # cv2.imshow('gray', frame)
+
+    dilated = cv2.dilate(frame, kernel, iterations=3)
+    cv2.imshow('th', dilated)
+    contours, _ = cv2.findContours(dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    for contour in contours:
+        (x, y, w, h) = cv2.boundingRect(contour)
+
+        if h > 15:  # potrebno je namsestiti
+            # cv2.rectangle(old_frame, (x, y), (x + w, y + h), (0, 255, 0), 1)
+
+            if line[1] < y + int(h/2) < line[1] + 400:
+                cv2.circle(old_frame, (x + int(w / 2), y + int(h / 2)), 1, (0, 255, 0), 3)
+            else:
+                cv2.circle(old_frame, (x + int(w / 2), y + int(h / 2)), 1, (0, 0, 255), 3)
+    cv2.rectangle(old_frame, (line[0] - 100, line[1]), (line[0] + 500, line[1] + 400), (0, 255, 0), 4)
+    cv2.imshow('new', old_frame)
 
 
 def process_video(path):
     print("aaaaaaa")
     cap = cv2.VideoCapture(path)
     ret, frame = cap.read()
-    original_frame = frame
+    old_frame = frame.copy
     # frame = frame[75:471, 200:480]
     x1, y1, x2, y2 = detection_line(frame)
-
+    aca = [x1, y1, x2, y2]
+    print(aca)
     while True:
+        old_frame = frame.copy()
         ret_val, frame = cap.read()
+        new_frame = frame.copy()
+
         original_frame = frame.copy()
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        frame = frame[75:471, 117:520]
+        # frame = frame[75:471, 117:520]
 
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
-        # frame = np.invert(frame)
-        frame = cv2.blur(frame, (3, 3))
-        frame = cv2.dilate(frame, kernel, iterations=1)
-        # frame = cv2.erode(frame, kernel, iterations=1)
-        frame = cv2.adaptiveThreshold(frame, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 5, 5)
-
-        count_people(frame)
+        # count_people(frame)
+        rect_people(old_frame, new_frame, aca)
         if not ret_val:
             break
         cv2.line(original_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
         cv2.imshow('video', original_frame)
-        cv2.waitKey(5)
+        cv2.waitKey(15)
 
 
-process_video('.\\Data\\video10.mp4')
+process_video('.\\Data\\video1.mp4')
